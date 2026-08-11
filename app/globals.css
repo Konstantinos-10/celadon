@@ -1,26 +1,116 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Palette */
+  --bone: #e8e5dd;
+  --bone-deep: #dedad0;
+  --ink: #171a16;
+  --pitch: #10130f;
+  --muted: #6e7268;
+  --celadon: #7e9b84;
+  --celadon-deep: #2e4433;
+
+  /* Type scale */
+  --step-display: clamp(3.25rem, 8.5vw, 8.5rem);
+  --step-h1: clamp(2.25rem, 4.5vw, 4rem);
+  --step-h2: clamp(1.5rem, 2.6vw, 2.25rem);
+  --step-numeral: clamp(2.5rem, 5vw, 5rem);
+  --step-body: 1rem;
+  --step-small: 0.8125rem;
+
+  /* Layout */
+  --content-max: 1440px;
+  --gutter: 24px;
+  --page-margin: clamp(1.5rem, 6vw, 7rem);
+  --section-pad: clamp(6rem, 14vh, 11rem);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-bone: var(--bone);
+  --color-bone-deep: var(--bone-deep);
+  --color-ink: var(--ink);
+  --color-pitch: var(--pitch);
+  --color-muted: var(--muted);
+  --color-celadon: var(--celadon);
+  --color-celadon-deep: var(--celadon-deep);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-instrument-serif);
+  --font-body: var(--font-instrument-sans);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bone);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-body);
+  line-height: 1.7;
+}
+
+/* Centred content column with responsive page margins */
+@utility page-shell {
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding-inline: var(--page-margin);
+}
+
+/* Twelve column grid with 24px gutters */
+@utility grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--gutter);
+}
+
+@utility section-pad {
+  padding-block: var(--section-pad);
+}
+
+/* Type steps */
+@utility text-display {
+  font-family: var(--font-display);
+  font-size: var(--step-display);
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+}
+
+@utility text-h1 {
+  font-family: var(--font-display);
+  font-size: var(--step-h1);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+@utility text-h2 {
+  font-family: var(--font-display);
+  font-size: var(--step-h2);
+  line-height: 1.15;
+}
+
+@utility text-numeral {
+  font-family: var(--font-display);
+  font-size: var(--step-numeral);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility text-body {
+  font-size: var(--step-body);
+  line-height: 1.7;
+}
+
+@utility text-small {
+  font-size: var(--step-small);
+  line-height: 1.55;
+}
+
+/* Motion is removed globally when the visitor asks for it.
+   Lenis and scrub behaviour are also gated in SmoothScrollProvider. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
