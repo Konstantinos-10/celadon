@@ -81,7 +81,10 @@ export default function About() {
 
   return (
     <section className="min-h-svh bg-bone-deep">
-      <div className="page-shell section-pad">
+      {/* Shallow top padding: this block covers the hero, so its heading
+         should ride close to the advancing edge rather than trail a
+         viewport of blank ground behind it */}
+      <div className="page-shell pb-[var(--section-pad)] pt-[clamp(3.5rem,8vh,6rem)]">
         {/* Heading, top left */}
         <div className="overflow-hidden">
           <motion.h2

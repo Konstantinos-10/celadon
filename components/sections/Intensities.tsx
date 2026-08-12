@@ -1,9 +1,13 @@
 "use client";
 
-/* Four intensities as The Descent. A pinned viewport on a deep green
-   field. Scroll deepens everything at once: the bottle crossfades
-   through the four renders and a radial glow behind it shifts through
-   the four liquid hexes while the name and wear time roll per step. */
+/* Four intensities as The Descent, then the dawn. A pinned viewport on
+   a deep green field. Scroll deepens everything at once: the bottle
+   crossfades through the four renders and a radial glow behind it
+   shifts through the four liquid hexes while the name and wear time
+   roll per step. The pin then holds past the last step: every element
+   leaves through its own edge, a bone layer rises over the dark field,
+   and the house content cascades in on the light before the stage
+   unpins into Acquire. */
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
@@ -17,10 +21,21 @@ import {
   type MotionValue,
   type Variants,
 } from "motion/react";
+import { HouseStage, HouseStatic } from "./House";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
-const TRACK_VH = 400;
+const TRACK_VH = 650;
 const NARROW_QUERY = "(max-width: 860px)";
+
+/* The four steps play out over the first stretch of the track; the
+   rest is the handoff: exits, the light rising, the house entering,
+   then a beat of rest before the unpin. */
+const DESCENT_END = 0.6;
+const HOUSE_AT = 0.8;
+
+/* 0 below a, 1 above b, linear between */
+const ramp = (p: number, a: number, b: number) =>
+  Math.min(1, Math.max(0, (p - a) / (b - a)));
 
 const STEPS = [
   {
@@ -92,28 +107,30 @@ const nameLetter: Variants = {
   },
 };
 
-function GiantName({ text }: { text: string }) {
+function GiantName({ text, show }: { text: string; show: boolean }) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-[5vh] h-[clamp(3.5rem,8.5vw,9.5rem)]">
       <AnimatePresence initial={false}>
-        <motion.h3
-          key={text}
-          className="absolute inset-x-0 bottom-0 whitespace-nowrap text-center font-display text-[clamp(2.75rem,7.5vw,8.5rem)] leading-none tracking-[-0.02em] text-bone"
-          variants={nameContainer}
-          initial="hidden"
-          animate="show"
-          exit="exit"
-        >
-          {text.split("").map((ch, i) => (
-            <motion.span
-              key={i}
-              variants={nameLetter}
-              className="inline-block"
-            >
+        {show && (
+          <motion.h3
+            key={text}
+            className="absolute inset-x-0 bottom-0 whitespace-nowrap text-center font-display text-[clamp(2.75rem,7.5vw,8.5rem)] leading-none tracking-[-0.02em] text-bone"
+            variants={nameContainer}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+          >
+            {text.split("").map((ch, i) => (
+              <motion.span
+                key={i}
+                variants={nameLetter}
+                className="inline-block"
+              >
               {ch === " " ? " " : ch}
-            </motion.span>
-          ))}
-        </motion.h3>
+              </motion.span>
+            ))}
+          </motion.h3>
+        )}
       </AnimatePresence>
     </div>
   );
@@ -147,6 +164,8 @@ export default function Intensities() {
   const [narrow, setNarrow] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
+  const [showName, setShowName] = useState(true);
+  const [houseIn, setHouseIn] = useState(false);
 
   const { scrollYProgress } = useScroll({
     target: trackRef,
@@ -161,42 +180,105 @@ export default function Intensities() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const glow = useTransform(scrollYProgress, CENTERS, GLOWS);
+  /* The original four-step choreography runs on this remapped value, so
+     extending the track for the handoff changes nothing about its feel */
+  const descent = useTransform(scrollYProgress, [0, DESCENT_END], [0, 1]);
+
+  const glow = useTransform(descent, CENTERS, GLOWS);
   const glowBg = useTransform(
     glow,
     (g) =>
       `radial-gradient(46% 42% at 50% 56%, ${g} 0%, rgba(0,0,0,0) 70%)`
   );
-  const scale = useTransform(scrollYProgress, [0, 1], [1, 1.06]);
+  const scale = useTransform(descent, [0, 1], [1, 1.06]);
+
+  /* The whole handoff — exits, the room going dark, the dawn — is
+     written straight onto the elements from the scroll callback.
+     Motion-value style bindings proved unreliable here: on the
+     re-render that mounts the house they can snap back to their
+     initial values, which dropped the dark stage back in behind the
+     house. Direct writes cannot be reset by a re-render. */
+  const glowRef = useRef<HTMLDivElement>(null);
+  const pitchRef = useRef<HTMLDivElement>(null);
+  const dawnRef = useRef<HTMLDivElement>(null);
+  const bottleExitRef = useRef<HTMLDivElement>(null);
+  const dataRef = useRef<HTMLDivElement>(null);
+  const indexRef = useRef<HTMLDivElement>(null);
+
+  const applyHandoff = (p: number) => {
+    const dark = ramp(p, 0.58, 0.66); // glow dies, pitch buries the green
+    const exit = ramp(p, 0.6, 0.68); // elements leave
+    const sink = ramp(p, 0.6, 0.7); // bottle travel
+    const fade = ramp(p, 0.6, 0.66); // side rails fade
+    const dawn = ramp(p, 0.66, 0.8); // bone rises over neutral pitch
+
+    if (glowRef.current) glowRef.current.style.opacity = String(1 - dark);
+    if (pitchRef.current) pitchRef.current.style.opacity = String(dark);
+    if (dawnRef.current) dawnRef.current.style.opacity = String(dawn);
+
+    const hidden = exit > 0.98 ? "hidden" : "visible";
+    const b = bottleExitRef.current;
+    if (b) {
+      b.style.opacity = String(1 - exit);
+      b.style.transform = `translateY(${sink * 30}vh)`;
+      b.style.visibility = hidden;
+    }
+    const d = dataRef.current;
+    if (d) {
+      d.style.opacity = String(1 - fade);
+      d.style.transform = `translateX(${exit * -45}vw)`;
+      d.style.visibility = hidden;
+    }
+    const n = indexRef.current;
+    if (n) {
+      n.style.opacity = String(1 - fade);
+      n.style.transform = `translateX(${exit * 30}vw)`;
+      n.style.visibility = hidden;
+    }
+  };
 
   useMotionValueEvent(scrollYProgress, "change", (p) => {
-    const idx = p < 0.25 ? 0 : p < 0.5 ? 1 : p < 0.75 ? 2 : 3;
+    const d = Math.min(p / DESCENT_END, 1);
+    const idx = d < 0.25 ? 0 : d < 0.5 ? 1 : d < 0.75 ? 2 : 3;
     setActive((cur) => (cur === idx ? cur : idx));
+    setShowName(p < 0.61);
+    setHouseIn(p > HOUSE_AT);
+    applyHandoff(p);
   });
 
-  /* Reduced motion and phones read the ladder as a calm stacked list */
+  /* Re-assert the handoff styles after every render, so nothing React
+     does can leave them stale; also covers loading mid-track */
+  useEffect(() => {
+    applyHandoff(scrollYProgress.get());
+  });
+
+  /* Reduced motion and phones read the ladder as a calm stacked list,
+     with the house following as a plain section */
   if (reduce || narrow) {
     return (
-      <section className="bg-[linear-gradient(160deg,var(--celadon-deep),var(--pitch))] text-bone">
-        <div className="page-shell section-pad flex flex-col gap-[10vh]">
-          {STEPS.map((s) => (
-            <div key={s.name} className="flex flex-col items-center text-center">
-              <Image
-                src={s.img}
-                alt=""
-                width={2244}
-                height={2804}
-                sizes="80vw"
-                className="h-[36vh] w-auto"
-              />
-              <h3 className="mt-6 text-h2">{s.name}</h3>
-              <p className="mt-2 text-small text-bone/70">
-                {s.oil} per cent oil, worn for {s.hours} hours
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <>
+        <section className="bg-[linear-gradient(160deg,var(--celadon-deep),var(--pitch))] text-bone">
+          <div className="page-shell section-pad flex flex-col gap-[10vh]">
+            {STEPS.map((s) => (
+              <div key={s.name} className="flex flex-col items-center text-center">
+                <Image
+                  src={s.img}
+                  alt=""
+                  width={2244}
+                  height={2804}
+                  sizes="80vw"
+                  className="h-[36vh] w-auto"
+                />
+                <h3 className="mt-6 text-h2">{s.name}</h3>
+                <p className="mt-2 text-small text-bone/70">
+                  {s.oil} per cent oil, worn for {s.hours} hours
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+        <HouseStatic />
+      </>
     );
   }
 
@@ -207,30 +289,49 @@ export default function Intensities() {
       style={{ height: `${TRACK_VH}vh` }}
     >
       <div className="sticky top-0 h-svh overflow-hidden bg-[linear-gradient(160deg,var(--celadon-deep)_0%,var(--pitch)_85%)] text-bone">
-        {/* The room is lit by the liquid */}
+        {/* The room is lit by the liquid; the glow color stays on
+           motion, its dimming is written directly in applyHandoff */}
         <motion.div
+          ref={glowRef}
           aria-hidden
           className="absolute inset-0"
           style={{ background: glowBg }}
         />
 
-        {/* The name at display scale, behind the bottle */}
-        <GiantName text={STEPS[active].name} />
+        {/* The darkest moment: the descent bottoms out in pitch before
+           the dawn, burying the green field under neutral black */}
+        <div
+          ref={pitchRef}
+          aria-hidden
+          className="absolute inset-0 bg-pitch"
+          style={{ opacity: 0 }}
+        />
 
-        {/* The bottle, crossfading through the four strengths */}
-        <motion.div
-          className="absolute left-1/2 top-1/2 h-[62vh] -translate-x-1/2 -translate-y-1/2"
-          style={{ scale }}
+        {/* The name at display scale, behind the bottle. Dropping the
+           element lets its own letter cascade play the exit. */}
+        <GiantName text={STEPS[active].name} show={showName} />
+
+        {/* The bottle, crossfading through the four strengths, sinking
+           out through the floor at the end of the descent. The exit
+           travel lives on the outer wrapper via applyHandoff. */}
+        <div ref={bottleExitRef} className="absolute inset-0">
+          <motion.div
+            className="absolute left-1/2 top-1/2 h-[62vh] -translate-x-1/2 -translate-y-1/2"
+            style={{ scale }}
+          >
+            <div className="relative h-full w-[calc(62vh*2244/2804)]">
+              {STEPS.map((_, i) => (
+                <BottleLayer key={i} progress={descent} index={i} />
+              ))}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Wear data, rolling on each step, leaving through the left edge */}
+        <div
+          ref={dataRef}
+          className="absolute left-[var(--page-margin)] top-1/2 -translate-y-1/2"
         >
-          <div className="relative h-full w-[calc(62vh*2244/2804)]">
-            {STEPS.map((_, i) => (
-              <BottleLayer key={i} progress={scrollYProgress} index={i} />
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Wear data, rolling on each step */}
-        <div className="absolute left-[var(--page-margin)] top-1/2 -translate-y-1/2">
           <div className="relative h-[3rem] w-[24ch] overflow-hidden">
             <AnimatePresence mode="wait">
               <motion.p
@@ -248,8 +349,11 @@ export default function Intensities() {
           </div>
         </div>
 
-        {/* Step indices */}
-        <div className="absolute right-[var(--page-margin)] top-1/2 flex -translate-y-1/2 flex-col gap-4 text-right font-display text-xl">
+        {/* Step indices, leaving through the right edge */}
+        <div
+          ref={indexRef}
+          className="absolute right-[var(--page-margin)] top-1/2 flex -translate-y-1/2 flex-col gap-4 text-right font-display text-xl"
+        >
           {["01", "02", "03", "04"].map((n, i) => (
             <span
               key={n}
@@ -261,6 +365,17 @@ export default function Intensities() {
             </span>
           ))}
         </div>
+
+        {/* Dawn layer: the light theme rising over the emptied dark stage */}
+        <div
+          ref={dawnRef}
+          aria-hidden
+          className="absolute inset-0 bg-bone-deep"
+          style={{ opacity: 0 }}
+        />
+
+        {/* The house, entering on the light */}
+        <HouseStage progress={scrollYProgress} visible={houseIn} />
       </div>
     </section>
   );

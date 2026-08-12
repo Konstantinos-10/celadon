@@ -251,9 +251,24 @@ export default function Hero() {
           ref={canvasRef}
           className="absolute inset-0 block h-full w-full"
         />
+        <Sleep progress={scrollYProgress} />
         <Overlay progress={scrollYProgress} animate />
       </div>
     </section>
+  );
+}
+
+/* The held frame washes toward bone while the next section covers it,
+   so the product visibly recedes instead of being cut mid-body by the
+   advancing edge. The cover begins around 0.72 of the track. */
+function Sleep({ progress }: { progress: MotionValue<number> }) {
+  const opacity = useTransform(progress, [0.72, 1], [0, 0.55]);
+  return (
+    <motion.div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 bg-bone"
+      style={{ opacity }}
+    />
   );
 }
 

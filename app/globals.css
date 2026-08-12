@@ -39,6 +39,14 @@
 }
 
 body {
+  /* Real custom properties for the font tokens. The @theme block only
+     inlines them into Tailwind-generated utilities; the handwritten
+     @utility rules below reference var(--font-display)/var(--font-body)
+     directly, and next/font attaches its variables on body, so this is
+     where they resolve. */
+  --font-display: var(--font-instrument-serif);
+  --font-body: var(--font-instrument-sans);
+
   background: var(--bone);
   color: var(--ink);
   font-family: var(--font-body);
